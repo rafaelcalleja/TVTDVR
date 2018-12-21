@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
   char m_deviceType[64];
   long m_userId;
   long channelId;
-  char* filename = new char(255);
+  char *filename = (char *) malloc(255*sizeof(char));
 
   memset(m_remoteIP, 0, sizeof(m_remoteIP));
   memset(m_username, 0, sizeof(m_username));
