@@ -23,6 +23,39 @@
 #include <netinet/in.h>
 #define PORT 7001
 
+int intlog(double base, double x) {
+    return (int)(log(x) / log(base));
+}
+
+bool is_file_exist(const char *fileName)
+{
+    std::ifstream infile(fileName);
+    return infile.good();
+}
+
+std::string lastTimestamp () {
+    std::time_t timestamp = std::time(0);
+    std::string ts = boost::lexical_cast<std::string>(timestamp);
+    std::string tsLessChar = ts.substr(0, ts.length() - 1);
+
+    std::string str = ts.substr(ts.length() - 1);
+    int second= std::stoi(str.c_str());
+
+    if (second >= 5) {
+        second = 5;
+    } else {
+        second = 0; 
+    }
+
+    std::string secondString = boost::lexical_cast<std::string>(second);
+    std::string lastMoment = tsLessChar + secondString;
+
+    std::cout << ts.c_str() << "\n";
+    std::cout << lastMoment.c_str() << "\n";
+
+    return lastMoment;
+}
+
 int main(int argc, char *argv[])
 {
   if (argc < 2)
@@ -77,13 +110,11 @@ int main(int argc, char *argv[])
   m_remotePort = std::stoi(config["port"].c_str());
   strcpy(m_username, config["username"].c_str());
   strcpy(m_password, config["password"].c_str());
-  channelId = std::stoi(config["channel"].c_str(), &sz);
 
   printf("IP %s\n", m_remoteIP);
   printf("Port %d\n", m_remotePort);
   printf("user %s\n", m_username);
   printf("pass %s\n", m_password);
-  printf("channel %d\n", channelId);
   printf("directory %s\n", config["directory"].c_str());
 
   HMODULE h;
@@ -205,7 +236,11 @@ int main(int argc, char *argv[])
     }
 
     valread = read(new_socket, buffer, 1024);
-    channelId = std::stoi(buffer, &sz);
+    channelId = 1;
+    if (true == isdigit(buffer[0])) {
+       channelId = atoi(buffer);
+    }
+
     n = scandir(directory.c_str(), &namelist, 0, alphasort);
 
     if (n < 0)
@@ -237,26 +272,31 @@ int main(int argc, char *argv[])
       free(namelist);
     }
 
-    timestamp = std::time(0);
-    ts = boost::lexical_cast<std::string>(timestamp);
+    ts = lastTimestamp();
     filename = directory + ts + channel_prefix + std::to_string(channelId) + extension;
 
-    char *newFilename = new char[filename.size() + 1];
-    std::strcpy(newFilename, filename.c_str());
-    printf("Capturing Screenshot %s\n", newFilename);
-    
-    clientInfo.lChannel = channelId - 1;
-    playHandle = livePlay(m_userId, &clientInfo, NULL, NULL);
+    if (true == is_file_exist(filename.c_str())) {
+      const char *newFilename = filename.c_str();
+      send(new_socket, newFilename, strlen(newFilename), 0 );
+    } else {
 
-    if (playHandle < 0)
-    {
-      printf("Error getting playHandle");
-      return EXIT_FAILURE;
+      char *newFilename = new char[filename.size() + 1];
+      std::strcpy(newFilename, filename.c_str());
+      printf("Capturing Screenshot %s\n", newFilename);
+      
+      clientInfo.lChannel = channelId - 1;
+      playHandle = livePlay(m_userId, &clientInfo, NULL, NULL);
+
+      if (playHandle < 0)
+      {
+        printf("Error getting playHandle");
+        return EXIT_FAILURE;
+      }
+
+      capturePicture(playHandle, newFilename);
+      stopLive(playHandle);
+      send(new_socket, newFilename, strlen(newFilename), 0 );
     }
-
-    capturePicture(playHandle, newFilename);
-    stopLive(playHandle);
-    send(new_socket, newFilename, strlen(newFilename), 0 );
   }
 
   cleanUp();
